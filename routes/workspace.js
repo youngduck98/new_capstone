@@ -134,6 +134,7 @@ router.post('/:hostWorkSpaceId/chat', async (req, res, next) => {
 // snapshot 변경
 router.post('/:hostWorkSpaceId/change/snapshot', async (req, res, next) => {
     try{
+        console.log(req.session.myWorkSpaceId + " " + req.params.hostWorkSpaceId)
         // 권한 확인 -> 내가 내 워크스페이스를 바꾸거나, 호스트가 다른 워크스페이스를 바꾼 경우
         if((req.session.myWorkSpaceId == req.body.changeWorkSpaceId) || req.session.myWorkSpaceId == req.params.hostWorkSpaceId) {
 

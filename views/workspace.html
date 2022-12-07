@@ -555,7 +555,7 @@
                 var workspace_other_xml = Blockly.Xml.workspaceToDom(other_workspace);
 
                 axios.post(getURLParams2_domain(document.location.href) + "/change/snapshot", {
-                    changeWorkspaceId: selected,
+                    changeWorkSpaceId: selected,
                     snapshot: Blockly.Xml.domToText(workspace_other_xml),
                 })
                     .then(() => {
@@ -569,7 +569,7 @@
                 return;
             }
         });
-
+        
         // 방입장
         socket.on('join_ex', function (data) {
             // 채팅 추가
@@ -636,7 +636,7 @@
             document.querySelector('#chat-list').appendChild(div);
         });
         // 누군가의 workspace에 변화가 있을 때
-        socket.on('changeSnapshot', function (data) {
+        socket.on('changeSnapshot', async function (data) {
             console.log("getchangesnapshot in here!")
             var sn = data.id;
             console.log(sn + "data!");
@@ -659,7 +659,7 @@
             }
         });
         // 누군가가 자신이 보는 otherworkspace를 변화시켰을 때 
-        socket.on('getSnapshot', function(data){
+        socket.on('getSnapshot', async function(data){
             // data.workspace.snapshot -> 니가 요청한 workspace의 snapshot 정보
             // data.workspace -> 니가 요청한 workspace
             // data.myWorkSpaceId -> 내 id와 비교
@@ -673,7 +673,17 @@
                 Blockly.Events.enable();
             }
         })
-    
+
+        axios.post(getURLParams2_domain(document.location.href) + "/change/snapshot", {
+            changeWorkSpaceId: '{{myWorkSpaceId}}',
+            snapshot: Blockly.Xml.domToText(workspace_my_xml),
+        })
+            .then(() => {
+                console.log('성공');
+            })
+            .catch((error) => {
+                console.error(error);
+            });
     }, false);
 
     function workspace_copy(workspace1, workspace2) {
