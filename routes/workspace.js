@@ -133,24 +133,26 @@ router.post('/:hostWorkSpaceId/chat', async (req, res, next) => {
 
 // snapshot 변경
 router.post('/:hostWorkSpaceId/change/snapshot', async (req, res, next) => {
-    //http://localhost:8002/workspace/3/change/snapshot
     try{
-        await WorkSpace.update({
-            snapshot: req.body.snapshot,
-        },{
-            where:{
-                id: req.body.workspaceId,
-            }
-        });
-        const changeWorkSpace = await WorkSpace.findOne({
-            where:{
-                id: req.body.workspaceId,
-            }
-        })
+        // 권한 확인 -> 내가 내 워크스페이스를 바꾸거나, 호스트가 다른 워크스페이스를 바꾼 경우
+        if((req.session.myWorkSpaceId == req.body.changeWorkSpaceId) || req.session.myWorkSpaceId == req.params.hostWorkSpaceId) {
 
-        console.log(req.req.body.workspaceId,'의 snapshot이 변경됐습니다');
-        req.app.get('io').to(req.params.hostWorkSpaceId).emit('changeSnapshot', changeWorkSpace);
+            await WorkSpace.update({
+                snapshot: req.body.snapshot,
+            }, {
+                where: {
+                    id: req.body.changeWorkSpaceId,
+                }
+            });
+            const changeWorkSpace = await WorkSpace.findOne({
+                where: {
+                    id: req.body.changeWorkSpaceId,
+                }
+            });
 
+            console.log(req.session.myWorkSpaceId, '가, ', req.body.changeWorkSpaceId, '의 snapshot을 변경했습니다');
+            req.app.get('io').to(req.params.hostWorkSpaceId).emit('changeSnapshot', changeWorkSpace);
+        }
     } catch(error){
         console.error(error);
         next(error);
