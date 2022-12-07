@@ -405,120 +405,8 @@
     const socket = io.connect('http://localhost:8002', {
         path: '/socket.io',
     });
-    // 방입장
-    socket.on('join_ex', function (data) {
-        // 채팅 추가
-        const div = document.createElement('div');
-        div.classList.add('system');
-        const chat = document.createElement('div');
-        div.textContent = data.chat;
-        div.appendChild(chat);
-        document.querySelector('#chat-list').appendChild(div);
 
-    });
-    // 새로운 사람 입장
-    socket.on('join_new', function (data) {
-        // 채팅 추가
-        const div = document.createElement('div');
-        div.classList.add('system');
-        const chat = document.createElement('div');
-        div.textContent = data.chat;
-        div.appendChild(chat);
-        document.querySelector('#chat-list').appendChild(div);
-
-        // 멤버 리스트 추가
-        const workspace = document.createElement('div');
-        workspace.classList.add('workspace-group');
-        const hostWorkSpaceId = document.createElement('div');
-        hostWorkSpaceId.classList.add('workspace-group-info');
-        hostWorkSpaceId.textContent = 'hostWorkSpaceId : ' + data.workspace.hostWorkSpaceId;
-        const subWorkSpaceId = document.createElement('div');
-        subWorkSpaceId.classList.add('workspace-group-info');
-        subWorkSpaceId.textContent = 'subWorkSpaceId : ' + data.workspace.subWorkSpaceId;
-        const hostUserId = document.createElement('div');
-        hostUserId.classList.add('workspace-group-info');
-        hostUserId.textContent = 'hostUserId : ' + data.workspace.hostUserId;
-        const subUserId = document.createElement('div');
-        subUserId.classList.add('workspace-group-info');
-        subUserId.textContent = 'subUserId : ' + data.workspace.subUserId;
-        const form = document.createElement('form');
-        form.method = 'post';
-        form.action = "{{workSpaceGroups[0].hostWorkSpaceId}}/change/watchingWorkSpaceId";
-        form.classList.add('workspace-change-form');
-        const input = document.createElement('input');
-        input.setAttribute('type', 'hidden');
-        input.setAttribute('name', 'subWorkSpaceId');
-        input.setAttribute('value', data.workspace.subWorkSpaceId);
-        input.classList.add('subWorkSpaceId');
-        const button = document.createElement('button');
-        button.type = 'submit';
-        button.textContent = '선택';
-        form.appendChild(input);
-        form.appendChild(button);
-        workspace.appendChild(hostWorkSpaceId);
-        workspace.appendChild(subWorkSpaceId);
-        workspace.appendChild(hostUserId);
-        workspace.appendChild(subUserId);
-        workspace.appendChild(form);
-        document.querySelector('#workspace-group-list').appendChild(workspace);
-    });
-    // 방퇴장
-    socket.on('exit', function (data) {
-        const div = document.createElement('div');
-        div.classList.add('system');
-        const chat = document.createElement('div');
-        div.textContent = data.chat;
-        div.appendChild(chat);
-        document.querySelector('#chat-list').appendChild(div);
-    });
-    // 채팅입력시 생성
-    socket.on('chat', function (data) {
-        // console.log(socket);
-        const div = document.createElement('div');
-        div.classList.add('user');
-        const name = document.createElement('div');
-        name.textContent = data.nick +": " + data.chat;
-        div.appendChild(name);
-        document.querySelector('#chat-list').appendChild(div);
-    });
-    // 누군가의 workspace에 변화가 있을 때
-    socket.on('changeSnapshot', function (data) {
-        var sn = data.id;
-        console.log(sn);
-        var xml = Blockly.Xml.textToDom(data.snapshot);
-        console.log(xml);
-
-        //내 workspace가 변했을 때
-        if (sn == '{{myWorkSpaceId}}') {
-            my_workspace.clear();
-            Blockly.Events.disable();
-            Blockly.Xml.domToWorkspace(xml, my_workspace);
-            Blockly.Events.enable();
-        }
-        //내가 보고있는 다른 workspace가 변했을 때
-        else if (sn == selected) {
-            other_workspace.clear();
-            Blockly.Events.disable();
-            Blockly.Xml.domToWorkspace(xml, other_workspace);
-            Blockly.Events.enable();
-        }
-    });
-    // 누군가가 자신이 보는 otherworkspace를 변화시켰을 때 
-    socket.on('getSnapshot', function(data){
-        // data.workspace.snapshot -> 니가 요청한 workspace의 snapshot 정보
-        // data.workspace -> 니가 요청한 workspace
-        // data.myWorkSpaceId -> 내 id와 비교
-
-        //after workspace 작업 처리
-        if(data.myWorkSpaceId == '{{myWorkSpaceId}}'){
-            var xml = Blockly.Xml.textToDom(data.workspace.snapshot);
-            other_workspace.clear();
-            Blockly.Events.disable();
-            Blockly.Xml.domToWorkspace(xml, other_workspace);
-            Blockly.Events.enable();
-        }
-    })
-    
+    // chat
     document.querySelector('#chat-form').addEventListener('submit', function (e) {
         e.preventDefault();
         if (e.target.chat.value) {
@@ -539,6 +427,16 @@
             e.preventDefault();
             const watchingWorkSpaceId = document.querySelector('#watchingWorkSpaceId');
             watchingWorkSpaceId.value = e.target.subWorkSpaceId.value;
+            selected = e.target.subWorkSpaceId.value;
+            //doing something
+            axios.post('{{workSpaceGroups[0].hostWorkSpaceId}}/get/snapshot', {
+                watchingWorkSpaceId: watchingWorkSpaceId.value,
+            })
+                .then(() => {})
+                .catch((err) => {
+                    console.error(err);
+                });
+
         });
     });
 </script>
@@ -608,9 +506,9 @@
 </script>
 
 <script>
-    document.addEventListener('DOMContentLoaded', async function () {
-//fill my container(left)
-//console.log(getURLParams(document.location.href));
+    var selected = getURLParams_last(document.location.href);
+
+    document.addEventListener('DOMContentLoaded', function () {
 
         my_workspace = Blockly.inject('content_area',
             {
@@ -618,57 +516,24 @@
                 edia: '../media/',
             });
 
-//fill other container(right)
         other_workspace = Blockly.inject('content_area1',
             {
                 toolbox: toolboxXml,
                 media: '../media/',
             });
 
-//make xml of user
-        for (var i = 0; i < user_list.length; i++) {
-            workspace_xml[user_list[i]] = Blockly.Xml.workspaceToDom(Blockly.inject('fake_workspace',
-                {
-                    toolbox: toolboxXml,
-                }));
-        }
-
-//fiil other_user
-        var count = 0;
-        for (var i = 0; i < user_list.length; i++) {
-            if (user_list[i] != user_name) {
-                count += 1;
-                other_user.push(user_list[i]);
-                console.log('other_user' + count);
-                document.getElementById('other_user' + count).innerText = user_list[i];
-            }
-        }
-        console.log(other_user);
-        selected = other_user[0];
-
-//fill user_tab
-        document.getElementById('user').innerText = user_name;
-        for (var i = 1; i <= other_user.length; i++) {
-            document.getElementById('other_user' + i).innerText = other_user[i - 1];
-        }
-
-//reserve words(for run's timeout)
+        //reserve words(for run's timeout)
         Blockly.JavaScript.addReservedWords('code,timeouts,checkTimeout');
 
-//insert listener about my change
+        //insert listener about my change
         my_workspace.addChangeListener((event) => {
             if (event.type === Blockly.Events.BLOCK_MOVE || event.type === Blockly.Events.BLOCK_CHANGE
                 || event.type == Blockly.Events.BLOCK_CREATE || event.type == Blockly.Events.BLOCK_DELETE) {
-                workspace_xml[user_name] = Blockly.Xml.workspaceToDom(my_workspace);
-                console.log(workspace_xml[user_name]);
-                window.localStorage.setItem(user_name, Blockly.Xml.domToText(workspace_xml[user_name]));
-                window.localStorage.setItem("now", user_name);
-
-                console.log(getURLParams2_domain(document.location.href) + '/change/snapshot');
-
+                var workspace_my_xml = Blockly.Xml.workspaceToDom(my_workspace);
+                console.log("push data!")
                 axios.post(getURLParams2_domain(document.location.href) + "/change/snapshot", {
-                    changeWorkspaceId: '{{myWorkSpaceId}}',
-                    snapshot: Blockly.Xml.domToText(workspace_xml[user_name]),
+                    changeWorkSpaceId: '{{myWorkSpaceId}}',
+                    snapshot: Blockly.Xml.domToText(workspace_my_xml),
                 })
                     .then(() => {
                         console.log('성공');
@@ -681,12 +546,137 @@
                 return;
             }
         });
+
+        //insert listener about other workspace
+        //axios로 보낼 때 내가 바꿀 수 있는 권한이
+        other_workspace.addChangeListener((event)=>{
+            if (event.type === Blockly.Events.BLOCK_MOVE || event.type === Blockly.Events.BLOCK_CHANGE
+                || event.type == Blockly.Events.BLOCK_CREATE || event.type == Blockly.Events.BLOCK_DELETE) {
+                var workspace_other_xml = Blockly.Xml.workspaceToDom(other_workspace);
+
+                axios.post(getURLParams2_domain(document.location.href) + "/change/snapshot", {
+                    changeWorkspaceId: selected,
+                    snapshot: Blockly.Xml.domToText(workspace_other_xml),
+                })
+                    .then(() => {
+                        console.log('성공');
+                    })
+                    .catch((error) => {
+                        console.error(error);
+                    });
+            }
+            if (event.isUiEvent) {
+                return;
+            }
+        });
+
+        // 방입장
+        socket.on('join_ex', function (data) {
+            // 채팅 추가
+            const div = document.createElement('div');
+            div.classList.add('system');
+            const chat = document.createElement('div');
+            div.textContent = data.chat;
+            div.appendChild(chat);
+            document.querySelector('#chat-list').appendChild(div);
+
+        });
+        // 새로운 사람 입장
+        socket.on('join_new', function (data) {
+            // 채팅 추가
+            const div = document.createElement('div');
+            div.classList.add('system');
+            const chat = document.createElement('div');
+            div.textContent = data.chat;
+            div.appendChild(chat);
+            document.querySelector('#chat-list').appendChild(div);
+
+            // 멤버 리스트 추가
+            const workspace = document.createElement('div');
+            workspace.classList.add('workspace-group');
+           
+            const subUserId = document.createElement('div');
+            subUserId.classList.add('workspace-group-info');
+            subUserId.textContent = 'subUserId : ' + data.workspace.subUserId;
+            const form = document.createElement('form');
+            form.method = 'post';
+            form.action = "{{workSpaceGroups[0].hostWorkSpaceId}}/change/watchingWorkSpaceId";
+            form.classList.add('workspace-change-form');
+            const input = document.createElement('input');
+            input.setAttribute('type', 'hidden');
+            input.setAttribute('name', 'subWorkSpaceId');
+            input.setAttribute('value', data.workspace.subWorkSpaceId);
+            input.classList.add('subWorkSpaceId');
+            const button = document.createElement('button');
+            button.type = 'submit';
+            button.textContent = '선택';
+            form.appendChild(input);
+            form.appendChild(button);
+            workspace.appendChild(subUserId);
+            workspace.appendChild(form);
+            document.querySelector('#workspace-group-list').appendChild(workspace);
+        });
+        // 방퇴장
+        socket.on('exit', function (data) {
+            const div = document.createElement('div');
+            div.classList.add('system');
+            const chat = document.createElement('div');
+            div.textContent = data.chat;
+            div.appendChild(chat);
+            document.querySelector('#chat-list').appendChild(div);
+        });
+        // 채팅입력시 받는것
+        socket.on('chat', function (data) {
+            // console.log(socket);
+            const div = document.createElement('div');
+            div.classList.add('user');
+            const name = document.createElement('div');
+            name.textContent = data.nick +": " + data.chat;
+            div.appendChild(name);
+            document.querySelector('#chat-list').appendChild(div);
+        });
+        // 누군가의 workspace에 변화가 있을 때
+        socket.on('changeSnapshot', function (data) {
+            console.log("getchangesnapshot in here!")
+            var sn = data.id;
+            console.log(sn + "data!");
+            console.log("selected: " + selected);
+            var xml = Blockly.Xml.textToDom(data.snapshot);
+
+            //내 workspace가 변했을 때
+            if (sn == '{{myWorkSpaceId}}') {
+                Blockly.Events.disable();
+                my_workspace.clear();
+                Blockly.Xml.domToWorkspace(xml, my_workspace);
+                Blockly.Events.enable();
+            }
+            //내가 보고있는 다른 workspace가 변했을 때
+            else if (sn == selected) {
+                Blockly.Events.disable();
+                other_workspace.clear();
+                Blockly.Xml.domToWorkspace(xml, other_workspace);
+                Blockly.Events.enable();
+            }
+        });
+        // 누군가가 자신이 보는 otherworkspace를 변화시켰을 때 
+        socket.on('getSnapshot', function(data){
+            // data.workspace.snapshot -> 니가 요청한 workspace의 snapshot 정보
+            // data.workspace -> 니가 요청한 workspace
+            // data.myWorkSpaceId -> 내 id와 비교
+            //after workspace 작업 처리
+            console.log("on getsnapshot")
+            if(data.myWorkSpaceId == '{{myWorkSpaceId}}'){
+                var xml = Blockly.Xml.textToDom(data.workspace.snapshot);
+                Blockly.Events.disable();
+                other_workspace.clear();
+                Blockly.Xml.domToWorkspace(xml, other_workspace);
+                Blockly.Events.enable();
+            }
+        })
+    
     }, false);
 
-//insert listener about other workspace
-//axios로 보낼 때 내가 바꿀 수 있는 권한이
-
-    async function workspace_copy(workspace1, workspace2) {
+    function workspace_copy(workspace1, workspace2) {
         var xmlDom = Blockly.Xml.workspaceToDom(workspace1);
         workspace2.clear();
         Blockly.Xml.domToWorkspace(xmlDom, workspace2);
@@ -704,11 +694,6 @@
             });
         Blockly.Xml.domToWorkspace(xmlDom, workspace);
     }
-
-
-
-    var student = ["student1", "student2", "student3"];
-    var selected = "other_user1";
 
     function student_tab_handler(clickedName) {
         selected = clickedName.id;

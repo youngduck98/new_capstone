@@ -152,7 +152,10 @@ router.post('/:hostWorkSpaceId/change/snapshot', async (req, res, next) => {
 
             console.log(req.session.myWorkSpaceId, '가, ', req.body.changeWorkSpaceId, '의 snapshot을 변경했습니다');
             req.app.get('io').to(req.params.hostWorkSpaceId).emit('changeSnapshot', changeWorkSpace);
+        
         }
+        
+        res.send('ok');
     } catch(error){
         console.error(error);
         next(error);
@@ -171,6 +174,7 @@ router.post('/:hostWorkSpaceId/get/snapshot', async (req, res, next) => {
             workspace,
             myWorkSpaceId: req.session.myWorkSpaceId
         });
+        res.send('ok');
 
     } catch (error){
         console.error(error);
