@@ -693,11 +693,20 @@
             // data.myWorkSpaceId -> 내 id와 비교
             //after workspace 작업 처리
             console.log("on getsnapshot")
-            if(data.myWorkSpaceId == '{{myWorkSpaceId}}' && data.workspace.snapshot != null){
+            if(data.myWorkSpaceId == '{{myWorkSpaceId}}' && selected == data.myWorkSpaceId){
                 var xml = Blockly.Xml.textToDom(data.workspace.snapshot);
                 Blockly.Events.disable();
                 other_workspace.clear();
+                my_workspace.clear();
+                Blockly.Xml.domToWorkspace(xml, my_workspace);
                 Blockly.Xml.domToWorkspace(xml, other_workspace);
+                Blockly.Events.enable();
+            }
+            else if(data.myWorkSpaceId == '{{myWorkSpaceId}}'){
+                var xml = Blockly.Xml.textToDom(data.workspace.snapshot);
+                Blockly.Events.disable();
+                my_workspace.clear();
+                Blockly.Xml.domToWorkspace(xml, my_workspace);
                 Blockly.Events.enable();
             }
             else if(selected == data.myWorkSpaceId){
@@ -710,9 +719,8 @@
         })
         
         //수정할 필요 있음. 내것을 받아와야 하는데 저장되어 있는 내것을 백지로 고침
-        axios.post(getURLParams2_domain(document.location.href) + "/change/snapshot", {
-            changeWorkSpaceId: '{{myWorkSpaceId}}',
-            snapshot: Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(my_workspace)),
+        axios.post(getURLParams2_domain(document.location.href) + "/get/snapshot", {
+            watchingWorkSpaceId: '{{myWorkSpaceId}}',
         })
             .then(() => {
                 console.log('성공');
@@ -720,6 +728,16 @@
             .catch((error) => {
                 console.error(error);
             });
+        
+        axios.post(getURLParams2_domain(document.location.href) + "/get/snapshot", {
+                watchingWorkSpaceId: selected,
+        })
+                .then(() => {
+                    console.log('성공');
+                })
+                .catch((error) => {
+                    console.error(error);
+                });
     }, false);
 
     function workspace_copy(workspace1, workspace2) {
