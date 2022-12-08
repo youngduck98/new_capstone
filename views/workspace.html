@@ -520,6 +520,8 @@
 <script>
     var selected = getURLParams_last(document.location.href);
     var mine = "{{myWorkSpace.id}}" 
+    var savebefore_lock_xml;
+    var lockstatus = false;
 
     document.addEventListener('DOMContentLoaded', function () {
 
@@ -762,11 +764,11 @@
         })
 
         socket.on('freeze',  function(){
-            if('{{hostWorkSpace.id}}' == mine){
+            if('{{hostWorkSpace.id}}' == mine || lockstatus){
                 console.log("not affected");
             }
             else{
-                var xmlDom = Blockly.Xml.workspaceToDom(my_workspace);
+                savebefore_lock_xml = Blockly.Xml.workspaceToDom(my_workspace);
                 my_workspace.dispose();
                 my_workspace = Blockly.inject('content_area',
                 {
@@ -774,17 +776,50 @@
                     media: '../media/',
                     readOnly: true,
                 });
-                console.log(xmlDom);
-                Blockly.Xml.domToWorkspace(xmlDom, my_workspace);
+                Blockly.Xml.domToWorkspace(savebefore_lock_xml, my_workspace);
+                lockstatus = true;
             }
         });
 
         socket.on('unfreeze',  function(){
-            if('{{hostWorkSpace.id}}' == mine){
+            console.log(!lockstatus);
+            if('{{hostWorkSpace.id}}' == mine || !lockstatus){
                 console.log("not affected");
             }
             else{
-                workspace_canmove(my_workspace);
+                my_workspace.dispose();
+                my_workspace = Blockly.inject('content_area',
+                {
+                    toolbox: toolboxXml,
+                    media: '../media/',
+                });
+                Blockly.Xml.domToWorkspace(savebefore_lock_xml, my_workspace);
+                lockstatus = false;
+
+                //
+                my_workspace.addChangeListener((event) => {
+                    console.log("changed");
+                    if (event.type === Blockly.Events.BLOCK_MOVE || event.type === Blockly.Events.BLOCK_CHANGE
+                        || event.type == Blockly.Events.BLOCK_CREATE || event.type == Blockly.Events.BLOCK_DELETE) {
+                        var workspace_my_xml = Blockly.Xml.workspaceToDom(my_workspace);
+                        console.log("push data!")
+                        axios.post(getURLParams2_domain(document.location.href) + "/change/snapshot", {
+                            changeWorkSpaceId: '{{myWorkSpace.id}}',
+                            snapshot: Blockly.Xml.domToText(workspace_my_xml),
+                        })
+                            .then(() => {
+                                console.log('성공');
+                            })
+                            .catch((error) => {
+                                console.error(error);
+                            });
+                    }
+
+                    if (event.isUiEvent) {
+                        return;
+                    }
+                });
+                //
             }
         });
         
