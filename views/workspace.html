@@ -497,6 +497,7 @@
     //add eventlistener at DOMContentLoaded
     var my_workspace;
     var other_workspace;
+    var null_workspace;
     var workspace_xml = {};
 
     function getURLParams_last(url) {
@@ -514,6 +515,7 @@
 <script>
     var selected = getURLParams_last(document.location.href);
     var mine = "{{myWorkSpaceId}}"
+
 
     document.addEventListener('DOMContentLoaded', function () {
 
@@ -534,6 +536,12 @@
                 toolbox: toolboxXml,
                 media: '../media/',
             });
+        
+        null_workspace = Blockly.inject('fake_workspace',
+        {
+            toolbox: toolboxXml,
+            media: '../media/',
+        });
 
         //reserve words(for run's timeout)
         Blockly.JavaScript.addReservedWords('code,timeouts,checkTimeout');
@@ -692,7 +700,12 @@
             // data.workspace -> 니가 요청한 workspace
             // data.myWorkSpaceId -> 내 id와 비교
             //after workspace 작업 처리
+            
             console.log("on getsnapshot")
+            if(data.workspace.snapshot == null){
+                data.workspace.snapshot = Blockly.workspaceToDom(null_workspace);
+            }
+            
             if(data.myWorkSpaceId == '{{myWorkSpaceId}}' && selected == data.myWorkSpaceId){
                 var xml = Blockly.Xml.textToDom(data.workspace.snapshot);
                 Blockly.Events.disable();
