@@ -19,6 +19,7 @@ router.post('/new', isLoggedIn, async (req, res, next) => {
             subWorkSpaceId: newWorkSpace.id,
             hostUserId: req.user.id,
             subUserId: req.user.id,
+            subUserNick: req.user.nick
         });
         res.redirect('/');
     } catch(error){
@@ -62,20 +63,15 @@ router.get('/:hostWorkSpaceId', isLoggedIn, async(req, res, next) => {
                 subWorkSpaceId: newSubWorkSpace.id,
                 hostUserId: exHostWorkSpace.userId,
                 subUserId: req.user.id,
+                subUserNick: req.user.nick,
             });
-            req.session.myWorkSpaceId = newSubWorkSpace.id; // 자신의 워크스페이스를 세션에 저장
-            req.session.userNick = req.user.nick;
         }
-        else{
-            req.session.myWorkSpaceId = exWorkSpace.subWorkSpaceId; // 자신의 워크스페이스를 세션에 저장
-            req.session.userNick = req.user.nick;
-        }
+     
         const workSpaceGroups = await WorkSpaceGroup.findAll({
             where: {
                 hostWorkSpaceId: req.params.hostWorkSpaceId,
             }
         });
-
         // 이전 채팅 불러오기
         const chats = await Chat.findAll({
             where: {
@@ -84,7 +80,7 @@ router.get('/:hostWorkSpaceId', isLoggedIn, async(req, res, next) => {
         });
 
         if(exWorkSpace){
-            req.app.get('io').to(req.params.hostWorkSpaceId).emit('join_ex',{
+            req.app.get('io').to(req.params.hostWorkSpaceId).emit('join_ex', {
                 chat: `${req.user.nick}님 입장`,
             });
         }
@@ -100,8 +96,21 @@ router.get('/:hostWorkSpaceId', isLoggedIn, async(req, res, next) => {
                 workspace: newSubWorkSpace,
             });
         }
-        req.session.watchingWorkSpaceId = req.params.hostWorkSpaceId; // 처음 보는 워크스페이스는 호스트로 초기화
-        res.render('workspace', {workSpaceGroups, chats, myWorkSpaceId: req.session.myWorkSpaceId, watchingWorkSpaceId: req.session.watchingWorkSpaceId});
+
+        const myWorkSpace = await WorkSpace.findOne({
+            where: {
+                userId: req.user.id,
+            }
+        });
+
+        req.session.myWorkSpaceId = myWorkSpace.id;
+
+        res.render('workspace', {
+            workSpaceGroups,
+            chats,
+            myWorkSpace,
+            hostWorkSpace: exHostWorkSpace,
+        });
     } catch(error){
         console.error(error);
         next(error);
@@ -181,6 +190,25 @@ router.post('/:hostWorkSpaceId/get/snapshot', async (req, res, next) => {
         console.error(error);
         next(error);
     }
+    router.post('/:hostWorkSpaceId/get/snapshot/my', async (req, res, next) => {
+        try{
+            const workspace = await WorkSpace.findOne({
+                where: {
+                    id: req.body.watchingWorkSpaceId,
+                }
+            });
+    
+            req.app.get('io').to(req.params.hostWorkSpaceId).emit('getMySnapshot', {
+                workspace,
+                myWorkSpaceId: req.session.myWorkSpaceId
+            });
+            res.send('ok');
+    
+        } catch (error){
+            console.error(error);
+            next(error);
+        }
+    });
 });
 
 module.exports = router;
