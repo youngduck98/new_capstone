@@ -9,7 +9,7 @@
             <table width="100%">
                 <tr id="tabRow" height="1em">
                     <td width="10%">live_block_project</td>
-                    <td id=user_name>user_host</td>
+                    <td id=user_name style="width: 15%;">user_host</td>
                     <td class="tabmax">
                         <button id="trashButton" class="notext" title="...">
                             <img src='../media/1x1.gif' class="trash icon21">
@@ -20,8 +20,6 @@
                         <button id="runButton" class="notext primary" title="...">
                             <img src='../media/1x1.gif' class="run icon21">
                         </button>
-                        <button id="stopButton" onclick="lock_button()">lock</button>
-                        <button id="stopButton" onclick="unlock_button()">un_lock</button>
                     </td>
                 </tr>
             </table>
@@ -365,18 +363,18 @@
         <div class="workspace-group-info">subWorkSpaceId : {{ workspace.subWorkSpaceId }}</div>
         <div class="workspace-group-info">hostUserId : {{ workspace.hostUserId }}</div>
         -->
-        <div class="workspace-group-info">subUserId : {{ workspace.subUserId }}</div>
-        <form action="{{workSpaceGroups[0].hostWorkSpaceId}}/change/watchingWorkSpaceId" class="workspace-change-form"
-              method="post">
-            <input type="hidden" class="subWorkSpaceId" name="subWorkSpaceId" value="{{ workspace.subWorkSpaceId }}" style="float:left">
-            <button type="submit" style="float: right">선택</button>
-            <div>a</div>
+
+        <div class="workspace-group-info" style="float: left">subUserId : {{ workspace.subUserId }}</div>
+        <form action="{{workSpaceGroups[0].hostWorkSpaceId}}/change/watchingWorkSpaceId" class="workspace-change-form" 
+        method="post">
+                <input type="hidden" class="subWorkSpaceId" name="subWorkSpaceId" value="{{ workspace.subWorkSpaceId }}" style="float: left">
+                <button type="submit" style="float: right; width:auto; display:block;">선택</button>
         </form>
     </div>
     {% endfor %}
 </div>
 
-<div style="overflow:scroll; width:50%; height:200px; float:right;">
+<div id = "log"; style="overflow:scroll; width:50%; height:200px; float:right;">
     <fieldset max>
         <div id="chat-list">
             {% for chat in chats %}
@@ -407,6 +405,10 @@
     });
 
     // chat
+    const log = document.getElementById("log");
+    log.scrollTop = log.scrollHeight;
+    log.isScrollBottom = true;
+
     document.querySelector('#chat-form').addEventListener('submit', function (e) {
         e.preventDefault();
         if (e.target.chat.value) {
@@ -420,6 +422,9 @@
                     console.error(err);
                 });
         }
+
+        log.scrollTop = log.scrollHeight;
+        log.isScrollBottom = true;
     });
 
     document.querySelectorAll('.workspace-change-form').forEach((form) => {
@@ -429,6 +434,7 @@
             watchingWorkSpaceId.value = e.target.subWorkSpaceId.value;
             selected = e.target.subWorkSpaceId.value;
             //doing something
+            console.log(1);
             axios.post('{{workSpaceGroups[0].hostWorkSpaceId}}/get/snapshot', {
                 watchingWorkSpaceId: watchingWorkSpaceId.value,
             })
@@ -507,9 +513,16 @@
 
 <script>
     var selected = getURLParams_last(document.location.href);
+    var mine = "{{myWorkSpaceId}}"
 
     document.addEventListener('DOMContentLoaded', function () {
 
+        if("{{myWorkSpaceId}}" == "{{workSpaceGroups[0].hostWorkSpaceId}}"){
+            document.getElementById("user_name").innerText += " " + mine;
+        }
+        else{
+            document.getElementById("user_name").innerText = "student " + mine;
+        }
         my_workspace = Blockly.inject('content_area',
             {
                 toolbox: toolboxXml,
@@ -597,19 +610,25 @@
            
             const subUserId = document.createElement('div');
             subUserId.classList.add('workspace-group-info');
-            subUserId.textContent = 'subUserId : ' + data.workspace.subUserId;
+            subUserId.textContent = 'student : ' + data.workspace.subUserId;
+
             const form = document.createElement('form');
             form.method = 'post';
             form.action = "{{workSpaceGroups[0].hostWorkSpaceId}}/change/watchingWorkSpaceId";
             form.classList.add('workspace-change-form');
+
             const input = document.createElement('input');
             input.setAttribute('type', 'hidden');
             input.setAttribute('name', 'subWorkSpaceId');
             input.setAttribute('value', data.workspace.subWorkSpaceId);
+            input.style = "float: left";
             input.classList.add('subWorkSpaceId');
+
             const button = document.createElement('button');
             button.type = 'submit';
             button.textContent = '선택';
+            button.style = "float: right";
+
             form.appendChild(input);
             form.appendChild(button);
             workspace.appendChild(subUserId);
@@ -643,8 +662,17 @@
             console.log("selected: " + selected);
             var xml = Blockly.Xml.textToDom(data.snapshot);
 
+            
+            if(sn ==selected && sn == '{{myWorkSpaceId}}'){
+                Blockly.Events.disable();
+                my_workspace.clear();
+                other_workspace.clear();
+                Blockly.Xml.domToWorkspace(xml, my_workspace);
+                Blockly.Xml.domToWorkspace(xml, other_workspace);
+                Blockly.Events.enable();
+            }
             //내 workspace가 변했을 때
-            if (sn == '{{myWorkSpaceId}}') {
+            else if (sn == '{{myWorkSpaceId}}') {
                 Blockly.Events.disable();
                 my_workspace.clear();
                 Blockly.Xml.domToWorkspace(xml, my_workspace);
@@ -665,18 +693,26 @@
             // data.myWorkSpaceId -> 내 id와 비교
             //after workspace 작업 처리
             console.log("on getsnapshot")
-            if(data.myWorkSpaceId == '{{myWorkSpaceId}}'){
+            if(data.myWorkSpaceId == '{{myWorkSpaceId}}' && data.workspace.snapshot != null){
                 var xml = Blockly.Xml.textToDom(data.workspace.snapshot);
                 Blockly.Events.disable();
                 other_workspace.clear();
                 Blockly.Xml.domToWorkspace(xml, other_workspace);
                 Blockly.Events.enable();
             }
+            else if(selected == data.myWorkSpaceId){
+                var xml = Blockly.Xml.textToDom(data.workspace.snapshot);
+                Blockly.Events.disable();
+                other_workspace.clear();
+                Blockly.Xml.domToWorkspace(xml, my_workspace);
+                Blockly.Events.enable();
+            }
         })
-
+        
+        //수정할 필요 있음. 내것을 받아와야 하는데 저장되어 있는 내것을 백지로 고침
         axios.post(getURLParams2_domain(document.location.href) + "/change/snapshot", {
             changeWorkSpaceId: '{{myWorkSpaceId}}',
-            snapshot: Blockly.Xml.domToText(workspace_my_xml),
+            snapshot: Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(my_workspace)),
         })
             .then(() => {
                 console.log('성공');
@@ -738,7 +774,7 @@
     };
 
     function discard() {
-        console.log(document.location.href);
+        
     };
 
     function download() {
@@ -762,5 +798,8 @@
     bindClick('trashButton', discard);
     bindClick('runButton', runJs);
     bindClick('linkButton', download);
+
+    //자동 scroll 추가
+
 </script>
 {% endblock %}
