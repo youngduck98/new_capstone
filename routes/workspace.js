@@ -65,6 +65,7 @@ router.get('/:hostWorkSpaceId', isLoggedIn, async(req, res, next) => {
                 subUserId: req.user.id,
                 subUserNick: req.user.nick,
             });
+            req.session.myWorkSpace = newSubWorkSpace;
         }
      
         const workSpaceGroups = await WorkSpaceGroup.findAll({
@@ -72,14 +73,22 @@ router.get('/:hostWorkSpaceId', isLoggedIn, async(req, res, next) => {
                 hostWorkSpaceId: req.params.hostWorkSpaceId,
             }
         });
+
         // 이전 채팅 불러오기
         const chats = await Chat.findAll({
             where: {
                 hostWorkSpaceId: req.params.hostWorkSpaceId
             }
         });
-
+        
+        // 내 워크스페이스가 존재?
         if(exWorkSpace){
+            const myWorkSpace = await WorkSpace.findOne({
+                where: {
+                    id: exWorkSpace.subWorkSpaceId,
+                }
+            });
+            req.session.myWorkSpace = myWorkSpace;
             req.app.get('io').to(req.params.hostWorkSpaceId).emit('join_ex', {
                 chat: `${req.user.nick}님 입장`,
             });
@@ -91,24 +100,22 @@ router.get('/:hostWorkSpaceId', isLoggedIn, async(req, res, next) => {
                     subUserId: req.user.id
                 }
             });
+            const myWorkSpace = await WorkSpace.findOne({
+                id: newSubWorkSpace.subWorkSpaceId,
+            });
+
             req.app.get('io').to(req.params.hostWorkSpaceId).emit('join_new',{
                 chat: `${req.user.nick}님 입장`,
                 workspace: newSubWorkSpace,
             });
         }
 
-        const myWorkSpace = await WorkSpace.findOne({
-            where: {
-                userId: req.user.id,
-            }
-        });
-
-        req.session.myWorkSpaceId = myWorkSpace.id;
-
+        req.session.myWorkSpaceId = req.session.myWorkSpace.id;
+        // console.log(req.session.myWorkSpace.id);
         res.render('workspace', {
             workSpaceGroups,
             chats,
-            myWorkSpace,
+            myWorkSpace : req.session.myWorkSpace,
             hostWorkSpace: exHostWorkSpace,
         });
     } catch(error){
@@ -172,6 +179,8 @@ router.post('/:hostWorkSpaceId/change/snapshot', async (req, res, next) => {
     }
 });
 
+// snapshot 받아오기
+// myworkspace
 router.post('/:hostWorkSpaceId/get/snapshot', async (req, res, next) => {
     try{
         const workspace = await WorkSpace.findOne({
@@ -190,25 +199,55 @@ router.post('/:hostWorkSpaceId/get/snapshot', async (req, res, next) => {
         console.error(error);
         next(error);
     }
-    router.post('/:hostWorkSpaceId/get/snapshot/my', async (req, res, next) => {
-        try{
-            const workspace = await WorkSpace.findOne({
-                where: {
-                    id: req.body.watchingWorkSpaceId,
-                }
-            });
-    
-            req.app.get('io').to(req.params.hostWorkSpaceId).emit('getMySnapshot', {
-                workspace,
-                myWorkSpaceId: req.session.myWorkSpaceId
-            });
+});
+
+// 내 스냅샷 받아오기
+// parsing문제 때문에 따로 받아옴
+router.post('/:hostWorkSpaceId/get/snapshot/my', async (req, res, next) => {
+    try{
+        const workspace = await WorkSpace.findOne({
+            where: {
+                id: req.body.watchingWorkSpaceId,
+            }
+        });
+
+        req.app.get('io').to(req.params.hostWorkSpaceId).emit('getMySnapshot', {
+            workspace,
+            myWorkSpaceId: req.session.myWorkSpaceId
+        });
+        res.send('ok');
+
+    } catch (error){
+        console.error(error);
+        next(error);
+    }
+});
+
+// freeze
+// 요청한 사람이 호스트인 경우, freeze를 뿌림
+router.post('/:hostWorkSpaceId/freeze', async (req, res, next) => {
+   try{
+       // 요청한 사람이 호스트인 경우
+       if(req.session.myWorkSpace.id == req.params.hostWorkSpaceId){
+           req.app.get('io').to(req.params.hostWorkSpaceId).emit('freeze');
+           res.send('ok');
+       }
+   } catch(error){
+       console.error(error);
+       next(error);
+   }
+});
+
+router.post('/:hostWorkSpaceId/unfreeze', async (req, res, next) => {
+    try{
+        if(req.session.myWorkSpace.id == req.params.hostWorkSpaceId){
+            req.app.get('io').to(req.params.hostWorkSpaceId).emit('unfreeze');
             res.send('ok');
-    
-        } catch (error){
-            console.error(error);
-            next(error);
         }
-    });
+    } catch (error){
+        console.error(error);
+        next(error);
+    }
 });
 
 module.exports = router;

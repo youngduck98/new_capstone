@@ -20,8 +20,10 @@
                         <button id="runButton" class="notext primary" title="...">
                             <img src='../media/1x1.gif' class="run icon21">
                         </button>
-                        <button id="copy_mineToOther">copy-></button>
-                        <button id="copy_otherToMine"><-copy</button>
+                        <button id="copy_mineToOther" onclick=copy_mineToOther()>copy-></button>
+                        <button id="copy_otherToMine" onclick=copy_otherToMine()><-copy</button>
+                        <button id="lock_otherpeople" onclick=lock_workspace()> lock </button>
+                        <button id="unlock_otherpeople" onclick=unlock_workspace()>unlock</button>
                     </td>
                 </tr>
             </table>
@@ -573,8 +575,10 @@
         //insert listener about other workspace
         //axios로 보낼 때 내가 바꿀 수 있는 권한이
         other_workspace.addChangeListener((event)=>{
+            console.log(event.type);
             if (event.type === Blockly.Events.BLOCK_MOVE || event.type === Blockly.Events.BLOCK_CHANGE
                 || event.type == Blockly.Events.BLOCK_CREATE || event.type == Blockly.Events.BLOCK_DELETE) {
+                console.log(2);
                 var workspace_other_xml = Blockly.Xml.workspaceToDom(other_workspace);
 
                 axios.post(getURLParams2_domain(document.location.href) + "/change/snapshot", {
@@ -642,26 +646,20 @@
             workspace.appendChild(subUserId);
             workspace.appendChild(form);
             document.querySelector('#workspace-group-list').appendChild(workspace);
-            
-            document.querySelectorAll('.workspace-change-form').forEach((form) => {
-                form.addEventListener('submit', (e) => {
-                    e.preventDefault();
-                    const watchingWorkSpaceId = document.querySelector('#watchingWorkSpaceId');
-                    watchingWorkSpaceId.value = e.target.subWorkSpaceId.value;
-                    selected = e.target.subWorkSpaceId.value;
-                    //doing something
-                    console.log(1);
-                    axios.post('{{workSpaceGroups[0].hostWorkSpaceId}}/get/snapshot', {
-                        watchingWorkSpaceId: watchingWorkSpaceId.value,
-                    })
-                        .then(() => {})
-                        .catch((err) => {
-                            console.error(err);
-                        });
-        
-                });
-            });
 
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const watchingWorkSpaceId = document.querySelector('#watchingWorkSpaceId');
+                watchingWorkSpaceId.value = data.workspace.subWorkSpaceId
+                selected = data.workspace.subWorkSpaceId;
+                axios.post('{{workSpaceGroups[0].hostWorkSpaceId}}/get/snapshot', {
+                    watchingWorkSpaceId: watchingWorkSpaceId.value,
+                })
+                    .then(() => {})
+                    .catch((err) => {
+                        console.error(err);
+                    });
+            })
         });
         // 방퇴장
         socket.on('exit', function (data) {
@@ -762,6 +760,33 @@
                 Blockly.Events.enable();
             }
         })
+
+        socket.on('freeze',  function(){
+            if('{{hostWorkSpace.id}}' == mine){
+                console.log("not affected");
+            }
+            else{
+                var xmlDom = Blockly.Xml.workspaceToDom(my_workspace);
+                my_workspace.dispose();
+                my_workspace = Blockly.inject('content_area',
+                {
+                    toolbox: toolboxXml,
+                    media: '../media/',
+                    readOnly: true,
+                });
+                console.log(xmlDom);
+                Blockly.Xml.domToWorkspace(xmlDom, my_workspace);
+            }
+        });
+
+        socket.on('unfreeze',  function(){
+            if('{{hostWorkSpace.id}}' == mine){
+                console.log("not affected");
+            }
+            else{
+                workspace_canmove(my_workspace);
+            }
+        });
         
         //수정할 필요 있음. 내것을 받아와야 하는데 저장되어 있는 내것을 백지로 고침
         axios.post(getURLParams2_domain(document.location.href) + "/get/snapshot/my", {
@@ -786,23 +811,52 @@
                 });
     }, false);
 
-    function workspace_copy(workspace1, workspace2) {
-        var xmlDom = Blockly.Xml.workspaceToDom(workspace1);
-        workspace2.clear();
-        Blockly.Xml.domToWorkspace(xmlDom, workspace2);
-    }
-
     //setting workspace to readonly
     async function workspace_readonly(workspace) {
         var xmlDom = Blockly.Xml.workspaceToDom(workspace);
         workspace.dispose();
-        workspace = Blockly.inject('content_area1',
+        workspace = Blockly.inject('content_area',
             {
                 toolbox: toolboxXml,
                 media: '../media/',
                 readOnly: true,
             });
         Blockly.Xml.domToWorkspace(xmlDom, workspace);
+    }
+
+    async function workspace_canmove(workspace){
+        var xmlDom = Blockly.Xml.workspaceToDom(workspace);
+        workspace.dispose();
+        workspace = Blockly.inject('content_area',
+            {
+                toolbox: toolboxXml,
+                media: '../media/',
+            });
+        Blockly.Xml.domToWorkspace(xmlDom, workspace);
+    }
+
+    function workspace_copy(workspace1, workspace2) {
+        var xmlDom = Blockly.Xml.workspaceToDom(workspace1);
+        workspace2.clear();
+        Blockly.Xml.domToWorkspace(xmlDom, workspace2);
+    }
+
+    function copy_otherToMine(){
+        console.log("<-copy");
+        workspace_copy(other_workspace, my_workspace);
+    }
+
+    function copy_mineToOther(){
+        console.log("copy->");
+        workspace_copy(my_workspace, other_workspace);
+    }
+
+    function lock_workspace(){
+        axios.post('{{workSpaceGroups[0].hostWorkSpaceId}}/freeze');
+    }
+
+    function unlock_workspace(){
+        axios.post('{{workSpaceGroups[0].hostWorkSpaceId}}/unfreeze');
     }
 
     function student_tab_handler(clickedName) {
